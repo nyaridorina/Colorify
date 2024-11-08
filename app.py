@@ -2,6 +2,7 @@ import os
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from PIL import Image, ImageFilter, ImageOps
 import io
+import numpy as np
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -17,14 +18,18 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def dodge(front, back):
+    """
+    Dodge blend function to lighten the image by blending front and back images.
+    """
+    result = front * 255 / (255 - back + 1)
+    result[result > 255] = 255
+    result[back == 255] = 255
+    return result.astype('uint8')
+
 def convert_to_coloring_page(image):
     """
-    Convert the input PIL Image to a coloring page version.
-    Steps:
-    1. Convert to grayscale.
-    2. Invert the image colors.
-    3. Apply edge detection.
-    4. Invert the edges to get black lines on white background.
+    Convert the input PIL Image to a coloring page version with outlines of different shades.
     """
     # Convert to grayscale
     gray = image.convert('L')
@@ -32,13 +37,26 @@ def convert_to_coloring_page(image):
     # Invert the grayscale image
     inverted = ImageOps.invert(gray)
     
-    # Apply edge detection
-    edges = inverted.filter(ImageFilter.FIND_EDGES)
+    # Apply Gaussian blur
+    blurred = inverted.filter(ImageFilter.GaussianBlur(radius=5))
     
-    # Further enhance edges by increasing contrast
-    enhanced_edges = edges.point(lambda x: 0 if x < 128 else 255, '1')
+    # Convert images to numpy arrays
+    gray_np = np.array(gray)
+    blurred_np = np.array(blurred)
     
-    return enhanced_edges.convert('L')
+    # Apply dodge blend
+    try:
+        final_np = dodge(blurred_np, gray_np)
+    except ZeroDivisionError:
+        final_np = gray_np
+    
+    # Convert back to PIL Image
+    final = Image.fromarray(final_np)
+    
+    # Enhance edges by increasing contrast
+    final = final.point(lambda x: x if x > 200 else 255)
+    
+    return final
 
 @app.route('/api/convert', methods=['POST'])
 def convert_image():
