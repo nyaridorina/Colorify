@@ -6,6 +6,10 @@ import os
 
 app = Flask(__name__)
 
+# Ensure required directories exist
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("static/output", exist_ok=True)
+
 # Function to create a coloring sheet
 def create_coloring_sheet(input_path, output_path, posterize_levels=4):
     try:
@@ -30,7 +34,8 @@ def create_coloring_sheet(input_path, output_path, posterize_levels=4):
 # Route for the homepage
 @app.route('/')
 def home():
-    return render_template('index.html')
+    # Render the homepage with an optional image_url
+    return render_template('index.html', image_url=None)
 
 # Route for file upload and processing
 @app.route('/upload', methods=['POST'])
@@ -46,8 +51,6 @@ def upload_file():
         # Save the uploaded file temporarily
         input_path = os.path.join("uploads", file.filename)
         output_path = os.path.join("static/output/coloring_sheet.jpg")
-        os.makedirs("uploads", exist_ok=True)
-        os.makedirs("static/output", exist_ok=True)
         file.save(input_path)
 
         # Create the coloring sheet
@@ -58,6 +61,7 @@ def upload_file():
         else:
             return jsonify({"error": "Failed to create coloring sheet"}), 500
     except Exception as e:
+        print(f"Error during upload or processing: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         # Clean up uploaded file
