@@ -1,14 +1,10 @@
-from flask import Flask, request, send_file, jsonify, render_template, url_for
+from flask import Flask, request, send_file, jsonify
 from PIL import Image, ImageOps
 import cv2
 import numpy as np
 import os
 
 app = Flask(__name__)
-
-# Ensure required directories exist
-os.makedirs("uploads", exist_ok=True)
-os.makedirs("static/output", exist_ok=True)
 
 # Function to create a coloring sheet
 def create_coloring_sheet(input_path, output_path, posterize_levels=4):
@@ -31,13 +27,19 @@ def create_coloring_sheet(input_path, output_path, posterize_levels=4):
         print(f"Error creating coloring sheet: {e}")
         return False
 
-# Route for the homepage
+# Define the route for the homepage
 @app.route('/')
 def home():
-    # Render the homepage with an optional image_url
-    return render_template('index.html', image_url=None)
+    return """
+    <h1>Coloring Sheet Generator</h1>
+    <p>Upload a photo to convert it into a coloring sheet!</p>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" />
+        <input type="submit" value="Upload" />
+    </form>
+    """
 
-# Route for file upload and processing
+# Define the route for file upload and processing
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -50,18 +52,17 @@ def upload_file():
     try:
         # Save the uploaded file temporarily
         input_path = os.path.join("uploads", file.filename)
-        output_path = os.path.join("static/output/coloring_sheet.jpg")
+        output_path = os.path.join("output", "coloring_sheet.jpg")
+        os.makedirs("uploads", exist_ok=True)
+        os.makedirs("output", exist_ok=True)
         file.save(input_path)
 
         # Create the coloring sheet
         if create_coloring_sheet(input_path, output_path):
-            # Generate the URL for the image
-            image_url = url_for('static', filename='output/coloring_sheet.jpg')
-            return render_template('index.html', image_url=image_url)
+            return send_file(output_path, as_attachment=True, download_name="coloring_sheet.jpg")
         else:
             return jsonify({"error": "Failed to create coloring sheet"}), 500
     except Exception as e:
-        print(f"Error during upload or processing: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         # Clean up uploaded file
