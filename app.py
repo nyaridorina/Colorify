@@ -59,7 +59,7 @@ def upload_file():
 
         # Create the Painting Base
         if create_coloring_sheet(input_path, output_path):
-            return send_file(output_path, as_attachment=True, download_name="coloring_sheet.jpg")
+            return send_file(output_path, as_attachment=True, download_name="painting_base.jpg")
         else:
             return jsonify({"error": "Failed to create coloring sheet"}), 500
     except Exception as e:
