@@ -27,10 +27,10 @@ async function uploadImage() {
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             resultDiv.innerHTML = `
-                <h2>Your Coloring Page:</h2>
+                <h2>Your Painting Base:</h2>
                 <img src="${url}" alt="Coloring Page">
                 <br>
-                <a href="${url}" download="coloring_page.png">Download Coloring Page</a>
+                <a href="${url}" download="painting_base.png">Download Coloring Page</a>
             `;
         } else {
             const errorData = await response.json();
