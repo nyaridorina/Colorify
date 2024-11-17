@@ -24,15 +24,15 @@ def create_coloring_sheet(input_path, output_path, posterize_levels=4):
         coloring_sheet.save(output_path)
         return True
     except Exception as e:
-        print(f"Error creating coloring sheet: {e}")
+        print(f"Error creating Painting Base: {e}")
         return False
 
 # Define the route for the homepage
 @app.route('/')
 def home():
     return """
-    <h1>Coloring Sheet Generator</h1>
-    <p>Upload a photo to convert it into a coloring sheet!</p>
+    <h1>Painting Base from Image</h1>
+    <p>Upload a photo to convert it into a Painting Base!</p>
     <form action="/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file" />
         <input type="submit" value="Upload" />
@@ -57,7 +57,7 @@ def upload_file():
         os.makedirs("output", exist_ok=True)
         file.save(input_path)
 
-        # Create the coloring sheet
+        # Create the Painting Base
         if create_coloring_sheet(input_path, output_path):
             return send_file(output_path, as_attachment=True, download_name="coloring_sheet.jpg")
         else:
