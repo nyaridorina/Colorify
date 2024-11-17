@@ -2,21 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colorify - Photo to Coloring Page</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Painting Base from Photo</title>
 </head>
 <body>
-    <h1>Colorify</h1>
-    <p>Convert your photos into coloring pages!</p>
-    
-    <input type="file" id="imageInput" accept="image/*">
-    <br>
-    <button onclick="uploadImage()">Convert</button>
-    
-    <div id="result"></div>
-
-    <script src="script.js"></script>
+    <h1>Painting Base from Photo</h1>
+    {% if image_url %}
+        <p>Here is your coloring sheet:</p>
+        <img src="{{ image_url }}" alt="Coloring Sheet" style="max-width: 100%; height: auto;">
+        <br><br>
+        <a href="{{ image_url }}" download="coloring_sheet.jpg">
+            <button>Download Painting Base</button>
+        </a>
+        <br><br>
+    {% else %}
+        <p>Upload a photo to convert it into a coloring sheet!</p>
+    {% endif %}
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" />
+        <input type="submit" value="Upload" />
+    </form>
 </body>
 </html>
