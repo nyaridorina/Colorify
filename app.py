@@ -1,123 +1,74 @@
-import os
-from flask import Flask, request, jsonify, send_file, send_from_directory
-from PIL import Image
+from flask import Flask, request, send_file, jsonify
+from PIL import Image, ImageOps
 import cv2
 import numpy as np
-import io
+import os
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+app = Flask(__name__)
 
-# Configuration
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB limit
+# Function to create a coloring sheet
+def create_coloring_sheet(input_path, output_path, posterize_levels=4):
+    try:
+        # Step 1: Posterize the image
+        img = Image.open(input_path).convert("RGB")
+        img = np.array(img)
+        img = img // (256 // posterize_levels) * (256 // posterize_levels)
+        posterized_img = Image.fromarray(img.astype('uint8'))
+        
+        # Step 2: Edge detection
+        edges = cv2.Canny(np.array(posterized_img.convert("L")), 100, 200)
+        edges = Image.fromarray(edges).convert("1")  # Convert to binary image
+        
+        # Step 3: Combine edges with posterized image
+        coloring_sheet = ImageOps.invert(edges).convert("L")  # Invert edges for white background
+        coloring_sheet.save(output_path)
+        return True
+    except Exception as e:
+        print(f"Error creating coloring sheet: {e}")
+        return False
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-def allowed_file(filename):
+# Define the route for the homepage
+@app.route('/')
+def home():
+    return """
+    <h1>Coloring Sheet Generator</h1>
+    <p>Upload a photo to convert it into a coloring sheet!</p>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" />
+        <input type="submit" value="Upload" />
+    </form>
     """
-    Check if the file has an allowed extension.
-    """
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def cartoonify_image(image):
-    """
-    Convert the input PIL Image to a cartoon-like image with outlines around color regions.
-    Steps:
-    1. Convert PIL Image to OpenCV format.
-    2. Apply bilateral filter to smooth colors while preserving edges.
-    3. Detect edges using adaptive thresholding.
-    4. Combine the edge mask with the smoothed color image.
-    5. Convert the final image back to PIL format.
-    """
-    # Convert PIL Image to OpenCV format
-    cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+# Define the route for file upload and processing
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    # Resize image for faster processing (optional)
-    # cv_image = cv2.resize(cv_image, (800, 600))
-
-    # Apply bilateral filter to reduce color palette and preserve edges
-    color = cv2.bilateralFilter(cv_image, d=9, sigmaColor=250, sigmaSpace=250)
-
-    # Convert to grayscale
-    gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-
-    # Apply median blur to reduce noise
-    gray = cv2.medianBlur(gray, 7)
-
-    # Detect edges using adaptive thresholding
-    edges = cv2.adaptiveThreshold(
-        gray,
-        255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY,
-        blockSize=9,
-        C=2
-    )
-
-    # Convert edges to color
-    edges_colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-
-    # Combine color image with edge mask using bitwise AND
-    cartoon = cv2.bitwise_and(color, edges_colored)
-
-    # Convert back to PIL Image
-    cartoon_pil = Image.fromarray(cv2.cvtColor(cartoon, cv2.COLOR_BGR2RGB))
-
-    return cartoon_pil
-
-@app.route('/api/convert', methods=['POST'])
-def convert_image():
-    """
-    API endpoint to convert an uploaded image to a coloring page.
-    Expects a file with the key 'image' in the form data.
-    Returns the converted image as a PNG file.
-    """
-    if 'image' not in request.files:
-        return jsonify({'error': 'No image provided'}), 400
-
-    file = request.files['image']
-
+    file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'Empty filename'}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Unsupported file type'}), 400
+        return jsonify({"error": "No selected file"}), 400
 
     try:
-        # Open the image file with PIL
-        img = Image.open(file.stream).convert('RGB')
+        # Save the uploaded file temporarily
+        input_path = os.path.join("uploads", file.filename)
+        output_path = os.path.join("output", "coloring_sheet.jpg")
+        os.makedirs("uploads", exist_ok=True)
+        os.makedirs("output", exist_ok=True)
+        file.save(input_path)
 
-        # Convert the image to a cartoon-like coloring page
-        coloring_page = cartoonify_image(img)
-
-        # Save the coloring page to a BytesIO object
-        img_io = io.BytesIO()
-        coloring_page.save(img_io, 'PNG')
-        img_io.seek(0)
-
-        return send_file(
-            img_io,
-            mimetype='image/png',
-            as_attachment=True,
-            download_name='coloring_page.png'
-        )
+        # Create the coloring sheet
+        if create_coloring_sheet(input_path, output_path):
+            return send_file(output_path, as_attachment=True, download_name="coloring_sheet.jpg")
+        else:
+            return jsonify({"error": "Failed to create coloring sheet"}), 500
     except Exception as e:
-        return jsonify({'error': f'Image processing failed: {str(e)}'}), 500
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Clean up uploaded file
+        if os.path.exists(input_path):
+            os.remove(input_path)
 
-@app.route('/')
-def serve_frontend():
-    """
-    Serve the frontend HTML page.
-    """
-    return send_from_directory(app.static_folder, 'index.html')
-
-@app.route('/<path:path>')
-def serve_static_files(path):
-    """
-    Serve static files (CSS, JS, images) from the 'static' directory.
-    """
-    return send_from_directory(app.static_folder, path)
-
+# Run the app
 if __name__ == '__main__':
-    # Enable debug mode for local development
     app.run(debug=True)
