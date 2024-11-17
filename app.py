@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify, render_template, url_for
 from PIL import Image, ImageOps
 import cv2
 import numpy as np
@@ -27,19 +27,12 @@ def create_coloring_sheet(input_path, output_path, posterize_levels=4):
         print(f"Error creating coloring sheet: {e}")
         return False
 
-# Define the route for the homepage
+# Route for the homepage
 @app.route('/')
 def home():
-    return """
-    <h1>Coloring Sheet Generator</h1>
-    <p>Upload a photo to convert it into a coloring sheet!</p>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" />
-        <input type="submit" value="Upload" />
-    </form>
-    """
+    return render_template('index.html')
 
-# Define the route for file upload and processing
+# Route for file upload and processing
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -52,14 +45,16 @@ def upload_file():
     try:
         # Save the uploaded file temporarily
         input_path = os.path.join("uploads", file.filename)
-        output_path = os.path.join("output", "coloring_sheet.jpg")
+        output_path = os.path.join("static/output/coloring_sheet.jpg")
         os.makedirs("uploads", exist_ok=True)
-        os.makedirs("output", exist_ok=True)
+        os.makedirs("static/output", exist_ok=True)
         file.save(input_path)
 
         # Create the coloring sheet
         if create_coloring_sheet(input_path, output_path):
-            return send_file(output_path, as_attachment=True, download_name="coloring_sheet.jpg")
+            # Generate the URL for the image
+            image_url = url_for('static', filename='output/coloring_sheet.jpg')
+            return render_template('index.html', image_url=image_url)
         else:
             return jsonify({"error": "Failed to create coloring sheet"}), 500
     except Exception as e:
